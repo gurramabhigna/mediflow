@@ -26,7 +26,9 @@ import {
   Check,
   HelpCircle,
   Info,
-  Sparkles
+  Sparkles,
+  Camera,
+  ArrowRight
 } from 'lucide-react';
 import { 
   DiagnosticTestCategory, 
@@ -37,6 +39,7 @@ import {
 import { PaymentModal } from './PaymentModal';
 import { TokenPassModal } from './TokenPassModal';
 import { getHospitalLabPackage } from '../data/hospitalLabPackages';
+import { PrescriptionScanner } from './PrescriptionScanner';
 
 export const renderTestCategoryIcon = (iconName: string, className: string = 'w-6 h-6') => {
   switch (iconName) {
@@ -71,6 +74,7 @@ export const LabModule: React.FC<LabModuleProps> = ({
   // Selected State
   const [selectedCategory, setSelectedCategory] = useState<DiagnosticTestCategory | null>(null);
   const [selectedLab, setSelectedLab] = useState<LabFacility | null>(null);
+  const [scannedFromRx, setScannedFromRx] = useState(false);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -153,7 +157,8 @@ export const LabModule: React.FC<LabModuleProps> = ({
             <button
               onClick={() => {
                 if (currentStep === 'test_type') onBackToChoice();
-                else if (currentStep === 'labs') setCurrentStep('test_type');
+                else if (currentStep === 'camera_scan') setCurrentStep('test_type');
+                else if (currentStep === 'labs') setCurrentStep(scannedFromRx ? 'camera_scan' : 'test_type');
                 else if (currentStep === 'checklist') setCurrentStep('labs');
                 else if (currentStep === 'token') setCurrentStep('checklist');
               }}
@@ -170,42 +175,95 @@ export const LabModule: React.FC<LabModuleProps> = ({
                 <span className="text-xs text-slate-500">Diagnostic Lab Test Flow</span>
               </div>
               <h2 className="text-lg font-black text-slate-900 mt-0.5">
-                {currentStep === 'test_type' && 'Step 1: Select Diagnostic Test Type'}
-                {currentStep === 'labs' && 'Step 2: Choose Accredited Lab / Hospital Facility'}
-                {currentStep === 'checklist' && 'Step 3: Hospital-Specific Package Breakdown & Live Checklist'}
-                {currentStep === 'token' && 'Step 5: Verified Digital Token Pass & Queue Status'}
+                {currentStep === 'test_type' && 'Step 1: Choose Test Package or Scan Prescription'}
+                {currentStep === 'camera_scan' && 'Step 2: AI Optical Prescription Scanner (Live Camera / Upload)'}
+                {currentStep === 'labs' && 'Step 3: Choose Accredited Lab / Hospital Facility'}
+                {currentStep === 'checklist' && 'Step 4: Hospital-Specific Package Breakdown & Live Checklist'}
+                {currentStep === 'token' && 'Step 6: Verified Digital Token Pass & Queue Status'}
               </h2>
             </div>
           </div>
 
-          {/* Progress Indicator */}
+          {/* Progress Indicator (6-step flow) */}
           <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 overflow-x-auto py-1">
             <span className={`px-2.5 py-1 rounded-lg whitespace-nowrap ${currentStep === 'test_type' ? 'bg-emerald-600 text-white font-bold shadow-xs' : 'bg-slate-100 text-slate-600'}`}>
-              1. Test Type
+              1. Test Selection
             </span>
             <span>→</span>
+            {currentStep === 'camera_scan' && (
+              <>
+                <span className="px-2.5 py-1 rounded-lg whitespace-nowrap bg-emerald-600 text-white font-bold shadow-xs">
+                  2. AI Rx Scan
+                </span>
+                <span>→</span>
+              </>
+            )}
             <span className={`px-2.5 py-1 rounded-lg whitespace-nowrap ${currentStep === 'labs' ? 'bg-emerald-600 text-white font-bold shadow-xs' : 'bg-slate-100 text-slate-600'}`}>
-              2. Choose Lab
+              {currentStep === 'camera_scan' || scannedFromRx ? '3. Choose Lab' : '2/3. Choose Lab'}
             </span>
             <span>→</span>
             <span className={`px-2.5 py-1 rounded-lg whitespace-nowrap ${currentStep === 'checklist' ? 'bg-emerald-600 text-white font-bold shadow-xs' : 'bg-slate-100 text-slate-600'}`}>
-              3. Hospital Package & Checklist
+              4. Hospital Package & Checklist
             </span>
             <span>→</span>
             <span className="px-2.5 py-1 rounded-lg whitespace-nowrap bg-slate-100 text-slate-500">
-              4. Payment
+              5. Payment
             </span>
             <span>→</span>
             <span className={`px-2.5 py-1 rounded-lg whitespace-nowrap ${currentStep === 'token' ? 'bg-emerald-600 text-white font-bold shadow-xs' : 'bg-slate-100 text-slate-600'}`}>
-              5. Digital Token
+              6. Digital Token
             </span>
           </div>
         </div>
       </div>
 
-      {/* STEP 1: Categorized Diagnostic Test Types & Packages */}
+      {/* STEP 1: Categorized Diagnostic Test Types OR Camera Prescription Scanner */}
       {currentStep === 'test_type' && (
-        <div className="space-y-4">
+        <div className="space-y-5">
+          
+          {/* CAMERA PRESCRIPTION SCANNER HERO PROMPT */}
+          <div className="relative overflow-hidden bg-gradient-to-r from-slate-950 via-emerald-950 to-slate-900 text-white rounded-3xl p-5 sm:p-7 border border-emerald-500/50 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5 group">
+            <div className="flex items-start gap-4 z-10">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/30 flex items-center justify-center shrink-0 shadow-lg group-hover:scale-105 transition-transform">
+                <Camera className="w-7 h-7" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-emerald-400 text-emerald-950 font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-emerald-950" />
+                    <span>AI Optical Prescription Scanner</span>
+                  </span>
+                  <span className="text-xs text-emerald-300 font-bold hidden sm:inline">• Live OCR Test Match</span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-white">
+                  Have a Doctor's Prescription? Scan It With Your Camera
+                </h3>
+                <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+                  Capture or upload your physical prescription. Our AI reads the prescribed clinical tests, isolates specific biomarkers, and automatically routes you to matching nearby labs.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setCurrentStep('camera_scan')}
+              className="bg-emerald-500 hover:bg-emerald-400 text-emerald-950 font-black text-xs sm:text-sm px-6 py-3.5 rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer shrink-0 z-10 hover:scale-102"
+            >
+              <Camera className="w-4 h-4" />
+              <span>Launch Camera Scanner</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            {/* Decorative background glow */}
+            <div className="absolute right-0 top-0 bottom-0 w-80 bg-emerald-500/10 blur-3xl pointer-events-none" />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px bg-slate-200 flex-1" />
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Or Choose Standardized Diagnostic Package
+            </span>
+            <div className="h-px bg-slate-200 flex-1" />
+          </div>
           
           <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="relative flex-1">
@@ -297,33 +355,75 @@ export const LabModule: React.FC<LabModuleProps> = ({
         </div>
       )}
 
-      {/* STEP 2: Nearby Labs / Hospitals Offering Selected Test */}
+      {/* STEP 2 (CAMERA / AI INTEGRATION): Prescription Camera Scanner */}
+      {currentStep === 'camera_scan' && (
+        <div className="space-y-4">
+          <PrescriptionScanner
+            onDetectedCategory={(cat) => {
+              setSelectedCategory(cat);
+              setScannedFromRx(true);
+              setCurrentStep('labs');
+            }}
+            onCancel={() => setCurrentStep('test_type')}
+          />
+        </div>
+      )}
+
+      {/* STEP 3: Nearby Labs / Hospitals Offering Selected Test */}
       {currentStep === 'labs' && selectedCategory && (
         <div className="space-y-4">
           
           {/* Selected Package Banner */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+          <div className={`border rounded-3xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs ${
+            scannedFromRx 
+              ? 'bg-emerald-950 text-white border-emerald-500 shadow-lg' 
+              : 'bg-emerald-50 border-emerald-200 text-slate-900'
+          }`}>
             <div className="flex items-start gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                scannedFromRx ? 'bg-emerald-500 text-emerald-950' : 'bg-emerald-600 text-white'
+              }`}>
                 {renderTestCategoryIcon(selectedCategory.iconName, 'w-6 h-6')}
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-emerald-200 text-emerald-900 font-black px-2 py-0.5 rounded uppercase">
-                    Step 1 Selected Package
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase flex items-center gap-1 ${
+                    scannedFromRx ? 'bg-emerald-400 text-emerald-950' : 'bg-emerald-200 text-emerald-900'
+                  }`}>
+                    {scannedFromRx ? (
+                      <>
+                        <Camera className="w-3 h-3" />
+                        <span>Prescription Scanned & Verified</span>
+                      </>
+                    ) : (
+                      <span>Selected Test Package</span>
+                    )}
                   </span>
-                  <span className="text-slate-500">• {selectedCategory.sampleRequired}</span>
+                  <span className={scannedFromRx ? 'text-emerald-300' : 'text-slate-500'}>
+                    • {selectedCategory.sampleRequired}
+                  </span>
                 </div>
-                <h3 className="text-base font-black text-slate-900">{selectedCategory.name}</h3>
-                <p className="text-slate-600 max-w-2xl text-xs">{selectedCategory.description}</p>
+                <h3 className={`text-base font-black ${scannedFromRx ? 'text-white' : 'text-slate-900'}`}>
+                  {selectedCategory.name}
+                </h3>
+                <p className={`max-w-2xl text-xs ${scannedFromRx ? 'text-slate-300' : 'text-slate-600'}`}>
+                  {selectedCategory.description}
+                </p>
               </div>
             </div>
 
             <button
-              onClick={() => setCurrentStep('test_type')}
-              className="text-xs text-emerald-800 hover:text-emerald-950 font-bold underline self-start md:self-center bg-white px-3 py-1.5 rounded-xl border border-emerald-300 shadow-2xs cursor-pointer"
+              onClick={() => {
+                setScannedFromRx(false);
+                setCurrentStep('test_type');
+              }}
+              className={`text-xs font-bold underline self-start md:self-center px-3.5 py-2 rounded-xl border shadow-2xs cursor-pointer transition ${
+                scannedFromRx
+                  ? 'bg-emerald-900 hover:bg-emerald-800 text-emerald-200 border-emerald-700'
+                  : 'bg-white hover:bg-slate-50 text-emerald-800 border-emerald-300'
+              }`}
             >
-              Change Test Package
+              Change Test
             </button>
           </div>
 

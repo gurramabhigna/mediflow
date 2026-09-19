@@ -8,11 +8,12 @@ export type DoctorFlowStep =
   | 'token';      // Step 5: Post-payment digital token pass
 
 export type LabFlowStep = 
-  | 'test_type'   // Step 1: Select diagnostic test type
-  | 'labs'        // Step 2: List nearby labs/hospitals offering test
-  | 'checklist'   // Step 3: Detailed live diagnostic checklist & safeguard
-  | 'payment'     // Step 4: Integrated payment step
-  | 'token';      // Step 5: Post-payment digital token pass
+  | 'test_type'   // Step 1: Select diagnostic test type (or launch camera prescription scanner)
+  | 'camera_scan' // Step 2: Camera / AI Prescription Scanner
+  | 'labs'        // Step 3: List nearby labs/hospitals offering test
+  | 'checklist'   // Step 4: Hospital-specific test breakdown & live checklist
+  | 'payment'     // Step 5: Integrated payment step
+  | 'token';      // Step 6: Post-payment digital token pass
 
 export interface MedicalSpecialty {
   id: string;

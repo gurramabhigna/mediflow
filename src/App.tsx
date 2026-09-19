@@ -39,6 +39,8 @@ import { TokenPassModal } from './components/TokenPassModal';
 export default function App() {
   // Main Choice Flow: 'choice' (Opening Screen) | 'doctor' (Module A) | 'lab' (Module B)
   const [currentChoice, setCurrentChoice] = useState<FlowChoice>('choice');
+  const [routedSpecialty, setRoutedSpecialty] = useState<MedicalSpecialty | null>(null);
+  const [routedDoctor, setRoutedDoctor] = useState<Doctor | null>(null);
 
   // Master Data
   const [specialties] = useState<MedicalSpecialty[]>(MEDICAL_SPECIALTIES);
@@ -220,7 +222,25 @@ export default function App() {
         {/* 1. Opening Screen / Choice */}
         {currentChoice === 'choice' && (
           <ChoiceScreen
-            onSelectChoice={(choice) => setCurrentChoice(choice)}
+            onSelectChoice={(choice) => {
+              setRoutedSpecialty(null);
+              setRoutedDoctor(null);
+              setCurrentChoice(choice);
+            }}
+            onRouteToSpecialty={(spec) => {
+              setRoutedSpecialty(spec);
+              setRoutedDoctor(null);
+              setCurrentChoice('doctor');
+            }}
+            onSelectDoctor={(doc) => {
+              setRoutedDoctor(doc);
+              const spec = specialties.find((s) => s.id === doc.specialtyId) || null;
+              setRoutedSpecialty(spec);
+              setCurrentChoice('doctor');
+            }}
+            onLaunchLabScan={() => {
+              setCurrentChoice('lab');
+            }}
             activeTokenCount={userTokens.length}
             onViewTokens={() => {
               if (userTokens.length > 0) setSelectedViewingToken(userTokens[0]);
@@ -234,7 +254,13 @@ export default function App() {
             specialties={specialties}
             hospitals={hospitals}
             doctors={doctors}
-            onBackToChoice={() => setCurrentChoice('choice')}
+            initialSpecialty={routedSpecialty}
+            initialDoctor={routedDoctor}
+            onBackToChoice={() => {
+              setRoutedSpecialty(null);
+              setRoutedDoctor(null);
+              setCurrentChoice('choice');
+            }}
             onTokenCreated={handleTokenCreated}
           />
         )}

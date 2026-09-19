@@ -14,16 +14,23 @@ import {
   Activity,
   HeartPulse
 } from 'lucide-react';
-import { FlowChoice } from '../types';
+import { FlowChoice, MedicalSpecialty } from '../types';
+import { AISymptomSearchBar } from './AISymptomSearchBar';
 
 interface ChoiceScreenProps {
   onSelectChoice: (choice: 'doctor' | 'lab') => void;
+  onRouteToSpecialty: (specialty: MedicalSpecialty) => void;
+  onSelectDoctor?: (doctor: any) => void;
+  onLaunchLabScan?: () => void;
   activeTokenCount: number;
   onViewTokens: () => void;
 }
 
 export const ChoiceScreen: React.FC<ChoiceScreenProps> = ({
   onSelectChoice,
+  onRouteToSpecialty,
+  onSelectDoctor,
+  onLaunchLabScan,
   activeTokenCount,
   onViewTokens,
 }) => {
@@ -49,7 +56,7 @@ export const ChoiceScreen: React.FC<ChoiceScreenProps> = ({
           <div className="pt-2">
             <button
               onClick={onViewTokens}
-              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow transition"
+              className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow transition cursor-pointer"
             >
               <Users className="w-4 h-4" />
               <span>You have {activeTokenCount} Active Queue Pass(es) — View Live Progress</span>
@@ -59,8 +66,35 @@ export const ChoiceScreen: React.FC<ChoiceScreenProps> = ({
         )}
       </div>
 
+      {/* Interactive AI Symptom Search Bar on Opening Screen */}
+      <div className="max-w-3xl mx-auto bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 sm:p-7 rounded-3xl text-white shadow-xl border border-slate-700/60 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-400 flex items-center justify-center">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-black text-white tracking-tight">
+                Not sure which specialist or test you need?
+              </h2>
+              <p className="text-[11px] text-slate-300">
+                Describe your health issue or symptoms to let our AI instantly recommend the right specialty.
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] bg-cyan-400/20 text-cyan-300 font-extrabold px-2.5 py-1 rounded-full border border-cyan-400/30 uppercase tracking-wider self-start sm:self-center">
+            AI Triage
+          </span>
+        </div>
+
+        <AISymptomSearchBar
+          onRouteToSpecialty={onRouteToSpecialty}
+          onSelectDoctor={onSelectDoctor}
+        />
+      </div>
+
       {/* Main Choice Cards: Doctor Appointment vs Lab Test */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 pt-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 pt-2">
         
         {/* Card 1: Doctor Appointment */}
         <div 

@@ -1,6 +1,6 @@
 {
   "name": "MediFlow",
   "description": "Unified platform for Doctor Appointments and Diagnostic Lab Test bookings with real-time queue management, live machine status checks, and integrated payments.",
-  "requestFramePermissions": ["geolocation"],
+  "requestFramePermissions": ["geolocation", "camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

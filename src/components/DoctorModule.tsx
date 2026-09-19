@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   HeartPulse, 
   Wind, 
@@ -43,6 +43,7 @@ import {
 import { CITIES } from '../data/mediflowData';
 import { PaymentModal } from './PaymentModal';
 import { TokenPassModal } from './TokenPassModal';
+import { AISymptomSearchBar } from './AISymptomSearchBar';
 
 // Icon mapper for 21 specialties
 export const renderSpecialtyIcon = (iconName: string, className: string = 'w-6 h-6') => {
@@ -76,6 +77,8 @@ interface DoctorModuleProps {
   specialties: MedicalSpecialty[];
   hospitals: Hospital[];
   doctors: Doctor[];
+  initialSpecialty?: MedicalSpecialty | null;
+  initialDoctor?: Doctor | null;
   onBackToChoice: () => void;
   onTokenCreated: (token: DoctorAppointmentToken) => void;
 }
@@ -84,25 +87,50 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
   specialties,
   hospitals,
   doctors,
+  initialSpecialty = null,
+  initialDoctor = null,
   onBackToChoice,
   onTokenCreated,
 }) => {
-  // Navigation Steps
-  const [currentStep, setCurrentStep] = useState<DoctorFlowStep>('specialty');
+  // Navigation & Direct Route State
+  const [isAiDirectRoute, setIsAiDirectRoute] = useState<boolean>(Boolean(initialSpecialty || initialDoctor));
+  const [currentStep, setCurrentStep] = useState<DoctorFlowStep>(
+    initialDoctor || initialSpecialty ? 'doctor' : 'specialty'
+  );
 
   // Selections
-  const [selectedSpecialty, setSelectedSpecialty] = useState<MedicalSpecialty | null>(null);
+  const [selectedSpecialty, setSelectedSpecialty] = useState<MedicalSpecialty | null>(
+    initialSpecialty || (initialDoctor ? specialties.find(s => s.id === initialDoctor.specialtyId) || null : null)
+  );
   const [selectedCity, setSelectedCity] = useState<string>('Hyderabad');
   const [selectedHospital, setSelectedHospital] = useState<Hospital | null>(null);
-  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(initialDoctor);
 
   // Search queries
   const [specialtySearch, setSpecialtySearch] = useState('');
   const [hospitalSearch, setHospitalSearch] = useState('');
+  const [showAiSearch, setShowAiSearch] = useState(false);
 
   // Payment & Token Modals
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(Boolean(initialDoctor));
   const [generatedToken, setGeneratedToken] = useState<DoctorAppointmentToken | null>(null);
+
+  // Update when initialDoctor or initialSpecialty changes
+  useEffect(() => {
+    if (initialDoctor) {
+      setSelectedDoctor(initialDoctor);
+      const spec = specialties.find((s) => s.id === initialDoctor.specialtyId) || null;
+      setSelectedSpecialty(spec);
+      setIsAiDirectRoute(true);
+      setCurrentStep('doctor');
+      setShowPaymentModal(true);
+    } else if (initialSpecialty) {
+      setSelectedSpecialty(initialSpecialty);
+      setIsAiDirectRoute(true);
+      setSelectedHospital(null);
+      setCurrentStep('doctor');
+    }
+  }, [initialDoctor, initialSpecialty, specialties]);
 
   // Filtered Specialties
   const filteredSpecialties = specialties.filter((s) =>
@@ -122,7 +150,7 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
     return matchesCity && matchesSpecialty && matchesSearch;
   });
 
-  // Filtered Doctors in Selected Hospital and Specialty
+  // Filtered Doctors in Selected Hospital and Specialty (or all hospitals in specialty when in AI direct route)
   const filteredDoctors = doctors.filter((d) => {
     const matchesHospital = selectedHospital ? d.hospitalId === selectedHospital.id : true;
     const matchesSpecialty = selectedSpecialty ? d.specialtyId === selectedSpecialty.id : true;
@@ -130,9 +158,16 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
   });
 
   // Flow handlers
-  const handleSelectSpecialty = (spec: MedicalSpecialty) => {
+  const handleSelectSpecialty = (spec: MedicalSpecialty, isAiDirect: boolean = false) => {
     setSelectedSpecialty(spec);
-    setCurrentStep('hospital');
+    if (isAiDirect) {
+      setIsAiDirectRoute(true);
+      setSelectedHospital(null);
+      setCurrentStep('doctor');
+    } else {
+      setIsAiDirectRoute(false);
+      setCurrentStep('hospital');
+    }
   };
 
   const handleSelectHospital = (hosp: Hospital) => {
@@ -142,6 +177,10 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
 
   const handleInitiateBooking = (doc: Doctor) => {
     setSelectedDoctor(doc);
+    if (!selectedHospital) {
+      const hosp = hospitals.find(h => h.id === doc.hospitalId) || hospitals[0];
+      setSelectedHospital(hosp);
+    }
     setShowPaymentModal(true);
   };
 
@@ -152,7 +191,8 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
     gender: 'Male' | 'Female' | 'Other';
     paymentMethod: 'upi' | 'card' | 'netbanking';
   }) => {
-    if (!selectedDoctor || !selectedHospital) return;
+    if (!selectedDoctor) return;
+    const hosp = selectedHospital || hospitals.find(h => h.id === selectedDoctor.hospitalId) || hospitals[0];
 
     try {
       const res = await fetch('/api/book-doctor', {
@@ -191,10 +231,17 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
               onClick={() => {
                 if (currentStep === 'specialty') onBackToChoice();
                 else if (currentStep === 'hospital') setCurrentStep('specialty');
-                else if (currentStep === 'doctor') setCurrentStep('hospital');
+                else if (currentStep === 'doctor') {
+                  if (isAiDirectRoute) {
+                    if (initialSpecialty || initialDoctor) onBackToChoice();
+                    else setCurrentStep('specialty');
+                  } else {
+                    setCurrentStep('hospital');
+                  }
+                }
                 else if (currentStep === 'token') setCurrentStep('doctor');
               }}
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
               title="Back to previous step"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -207,32 +254,60 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
                 <span className="text-xs text-slate-500">Doctor Appointment Flow</span>
               </div>
               <h2 className="text-lg font-black text-slate-900 leading-tight">
-                {currentStep === 'specialty' && 'Step 1: Choose Medical Specialty'}
+                {currentStep === 'specialty' && 'Step 1: Choose Medical Specialty (21 Grid or AI Matcher)'}
                 {currentStep === 'hospital' && `Step 2: Select Hospital in ${selectedCity}`}
-                {currentStep === 'doctor' && `Step 3: Available Doctors at ${selectedHospital?.name}`}
-                {currentStep === 'token' && 'Step 5: Digital OPD Queue Token Generated'}
+                {currentStep === 'doctor' && (
+                  isAiDirectRoute 
+                    ? `Step 2 (AI Direct Route): Recommended Doctors for ${selectedSpecialty?.name || 'Selected Issue'}`
+                    : `Step 3: Available Doctors at ${selectedHospital?.name || 'Selected Hospital'}`
+                )}
+                {currentStep === 'token' && (
+                  isAiDirectRoute
+                    ? 'Step 4: Digital OPD Queue Token Generated'
+                    : 'Step 5: Digital OPD Queue Token Generated'
+                )}
               </h2>
             </div>
           </div>
 
           {/* Stepper Dots */}
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'specialty' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-              1. Specialty
-            </span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'hospital' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-              2. Hospital
-            </span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'doctor' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-              3. Doctor & Queue
-            </span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-            <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'token' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-              4/5. Pay & Token
-            </span>
-          </div>
+          {isAiDirectRoute ? (
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'specialty' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                1. AI Symptom Match
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'doctor' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                2. AI Direct Doctors
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className={`px-2.5 py-1 rounded-lg font-bold ${showPaymentModal ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                3. Pay
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'token' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                4. Digital Token
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs">
+              <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'specialty' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                1. Specialty
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'hospital' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                2. Hospital
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'doctor' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                3. Doctor & Queue
+              </span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className={`px-2.5 py-1 rounded-lg font-bold ${currentStep === 'token' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                4/5. Pay & Token
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -240,6 +315,46 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
       {currentStep === 'specialty' && (
         <div className="space-y-4">
           
+          {/* AI Symptom Matcher Banner or Interactive Card */}
+          <div className="bg-gradient-to-r from-slate-900 to-cyan-950 p-5 rounded-3xl text-white shadow-md border border-cyan-800/50 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">
+                    Need Help Selecting a Specialist?
+                  </h3>
+                  <p className="text-[11px] text-slate-300">
+                    Let our AI symptom matcher analyze your health condition and route you to the right medical department.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAiSearch(!showAiSearch)}
+                className="text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded-xl transition cursor-pointer self-start sm:self-center shrink-0"
+              >
+                {showAiSearch ? 'Hide AI Matcher' : 'Use AI Symptom Matcher'}
+              </button>
+            </div>
+
+            {showAiSearch && (
+              <div className="pt-2 border-t border-cyan-800/60">
+                <AISymptomSearchBar
+                  compact
+                  onRouteToSpecialty={(spec) => handleSelectSpecialty(spec, true)}
+                  onSelectDoctor={(doc) => {
+                    const spec = specialties.find((s) => s.id === doc.specialtyId) || null;
+                    setSelectedSpecialty(spec);
+                    setIsAiDirectRoute(true);
+                    handleInitiateBooking(doc);
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
           {/* Controls: Search & City Selection */}
           <div className="flex flex-col sm:flex-row gap-3 bg-white p-4 rounded-2xl border border-slate-200">
             <div className="relative flex-1">
@@ -393,30 +508,71 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
         </div>
       )}
 
-      {/* STEP 3: List of Available Doctors with Live Queue & Wait Time */}
-      {currentStep === 'doctor' && selectedHospital && selectedSpecialty && (
+      {/* STEP 3 (or Step 2 in AI Direct Route): List of Available Doctors with Live Queue & Wait Time */}
+      {currentStep === 'doctor' && selectedSpecialty && (
         <div className="space-y-4">
           
           {/* Selected Context */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div>
-              <span className="text-slate-400">Viewing doctors at:</span>
-              <h3 className="text-sm font-bold text-slate-900">{selectedHospital.name} ({selectedSpecialty.name})</h3>
-              <p className="text-slate-500 text-[11px]">{selectedHospital.address}</p>
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cyan-600 text-white flex items-center justify-center shrink-0">
+                {renderSpecialtyIcon(selectedSpecialty.iconName, 'w-5 h-5')}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-cyan-100 text-cyan-800 font-extrabold px-2 py-0.5 rounded uppercase tracking-wider">
+                    {isAiDirectRoute ? 'AI Direct Route' : 'Hospital OPD'}
+                  </span>
+                  {isAiDirectRoute && (
+                    <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">
+                      Hospital Filter Skipped
+                    </span>
+                  )}
+                </div>
+                <h3 className="text-sm font-black text-slate-900 mt-0.5">
+                  Recommended Doctors for {selectedSpecialty.name}
+                </h3>
+                <p className="text-slate-500 text-[11px]">
+                  {selectedHospital 
+                    ? `Practicing at ${selectedHospital.name} (${selectedHospital.locality}, ${selectedCity})`
+                    : `Verified specialists across top hospitals in ${selectedCity}`}
+                </p>
+              </div>
             </div>
-            <button
-              onClick={() => setCurrentStep('hospital')}
-              className="text-xs text-cyan-700 hover:text-cyan-900 font-bold underline"
-            >
-              Choose Different Hospital
-            </button>
+
+            <div className="flex items-center gap-2 self-start sm:self-center">
+              {isAiDirectRoute ? (
+                <button
+                  onClick={() => {
+                    setIsAiDirectRoute(false);
+                    setCurrentStep('hospital');
+                  }}
+                  className="text-xs text-cyan-700 hover:text-cyan-900 font-bold bg-cyan-50 px-3 py-1.5 rounded-xl border border-cyan-200 transition cursor-pointer"
+                >
+                  Filter by Hospital
+                </button>
+              ) : (
+                <button
+                  onClick={() => setCurrentStep('hospital')}
+                  className="text-xs text-cyan-700 hover:text-cyan-900 font-bold underline cursor-pointer"
+                >
+                  Change Hospital
+                </button>
+              )}
+              <button
+                onClick={() => setCurrentStep('specialty')}
+                className="text-xs text-slate-500 hover:text-slate-800 font-bold px-3 py-1.5 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+              >
+                Change Specialty
+              </button>
+            </div>
           </div>
 
           {/* Doctors List */}
           <div className="space-y-4">
             {filteredDoctors.length === 0 ? (
               <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 text-slate-500 text-xs">
-                No doctors currently listed for {selectedSpecialty.name} at this facility.
+                No doctors currently listed for {selectedSpecialty.name} {selectedHospital ? `at ${selectedHospital.name}` : `in ${selectedCity}`}.
               </div>
             ) : (
               filteredDoctors.map((doc) => (
@@ -446,7 +602,14 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
                         <p className="text-xs text-slate-600 font-medium">
                           {doc.qualification} • {doc.experienceYears} Years Experience
                         </p>
-                        <p className="text-xs text-slate-500 mt-1 max-w-xl">
+
+                        {/* Specific Hospital Name where doctor practices */}
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/80 w-fit mt-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-cyan-600 shrink-0" />
+                          <span>{doc.hospitalName}</span>
+                        </div>
+
+                        <p className="text-xs text-slate-500 mt-1.5 max-w-xl">
                           {doc.about}
                         </p>
                       </div>
@@ -464,7 +627,7 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
                       <span className="text-slate-500 block text-[11px]">Room Number:</span>
                       <div className="flex items-center gap-1.5 font-bold text-slate-900 mt-0.5">
                         <DoorOpen className="w-4 h-4 text-cyan-600" />
-                        <span className="text-cyan-800">{doc.roomNumber}</span>
+                        <span className="text-cyan-800">Room {doc.roomNumber}</span>
                       </div>
                     </div>
 
@@ -490,7 +653,7 @@ export const DoctorModule: React.FC<DoctorModuleProps> = ({
                     </span>
                     <button
                       onClick={() => handleInitiateBooking(doc)}
-                      className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5"
+                      className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer"
                     >
                       <CreditCard className="w-4 h-4" />
                       <span>Book & Proceed to Payment</span>
